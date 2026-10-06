@@ -52,7 +52,7 @@ More detail in [docs/architecture.md](docs/architecture.md).
 | ✅ Implemented | Save/load workflows on the server, and import/export as JSON |
 | ✅ Implemented | Read-only SQL guard (blocks DROP/DELETE/UPDATE/ALTER/TRUNCATE and more unless explicitly enabled) |
 | ✅ Implemented | MCP client with a pluggable data source registry (JSON config) |
-| ✅ Implemented | Reference MCP servers: SQLite (demo) and PostgreSQL |
+| ✅ Implemented | Reference MCP servers: SQLite (demo), PostgreSQL and MySQL |
 | ✅ Implemented | Natural language → reviewable SQL plan via the OpenAI Agents SDK (needs your own API key; untested against the live API in CI) |
 | ✅ Implemented | Provider interface (`LLMProvider`) so other LLM vendors can be added |
 | 🚧 Planned | Additional LLM providers (e.g. Anthropic) |
@@ -60,7 +60,7 @@ More detail in [docs/architecture.md](docs/architecture.md).
 | 🚧 Planned | More transforms (group/aggregate, join, pivot) and richer charts |
 | 🚧 Planned | Scheduled/automated re-runs, run history |
 | 🚧 Planned | Authentication, multi-user workspaces, sharing |
-| 🚧 Planned | More connectors (MySQL, BigQuery, files/Parquet) |
+| 🚧 Planned | More connectors (BigQuery, files/Parquet) |
 
 ## Quickstart (Docker, SQLite demo)
 
@@ -100,7 +100,7 @@ is defense in depth, not a SQL parser. Details and limits are in [SECURITY.md](S
 ```
 backend/       FastAPI app, executor, safety guard, MCP client, agent layer, tests
 frontend/      React + TypeScript + Vite + Tailwind canvas UI
-mcp-servers/   Reference MCP servers (postgres, sqlite)
+mcp-servers/   Reference MCP servers (postgres, sqlite, mysql)
 examples/      Demo dataset and example workflows
 config/        Data source registry files
 docs/          Architecture, adding data sources, good first issues
