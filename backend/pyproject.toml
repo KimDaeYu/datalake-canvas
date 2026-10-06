@@ -14,7 +14,7 @@ dependencies = [
   "uvicorn[standard]>=0.30",
   "pydantic>=2.7",
   "pydantic-settings>=2.3",
-  "mcp>=1.10,<2",
+  "mcp>=1.10,<3",
   "openai-agents>=0.2",
 ]
 
