@@ -1,0 +1,32 @@
+# Secrets & local config
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+
+# Node
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# App data
+data/
+*.db
+*.sqlite
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

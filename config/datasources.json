@@ -1,0 +1,13 @@
+{
+  "datasources": [
+    {
+      "id": "demo-sqlite",
+      "name": "Demo shop (SQLite)",
+      "description": "Synthetic online-shop data: customers, products, orders.",
+      "dialect": "sqlite",
+      "command": "python",
+      "args": ["${DLC_ROOT}/mcp-servers/sqlite/server.py"],
+      "env": { "SQLITE_DB_PATH": "${DLC_DATA_DIR}/demo.db" }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+# Single ruff config for backend/, mcp-servers/ and examples/. Run `ruff check .` from the repo root.
+target-version = "py311"
+line-length = 100
+extend-exclude = ["frontend", ".venv"]
+
+[lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = [
+  "RUF012",  # pydantic models use mutable class defaults safely
+  "B008",    # FastAPI Depends() in defaults
+  "E501",    # `ruff format` wraps code; long comments/strings are tolerated
+]
+
+[lint.isort]
+known-first-party = ["datalake_canvas", "tests"]

@@ -1,0 +1,33 @@
+# docker compose up --build
+#   UI:  http://localhost:8080      API docs: http://localhost:8000/docs
+# The SQLite demo database is built into the backend image (no separate DB container).
+# For PostgreSQL: docker compose -f docker-compose.yml -f docker-compose.postgres.yml up --build
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      # Optional. Without a key everything works except the natural-language box.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DLC_OPENAI_MODEL: ${DLC_OPENAI_MODEL:-gpt-4.1-mini}
+      # Read-only by default. See SECURITY.md before changing this.
+      DLC_ALLOW_WRITE_QUERIES: ${DLC_ALLOW_WRITE_QUERIES:-false}
+    volumes:
+      - workflows:/data/workflows
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  workflows:

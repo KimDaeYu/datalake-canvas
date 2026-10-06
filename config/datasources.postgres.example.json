@@ -1,0 +1,22 @@
+{
+  "datasources": [
+    {
+      "id": "demo-sqlite",
+      "name": "Demo shop (SQLite)",
+      "description": "Synthetic online-shop data: customers, products, orders.",
+      "dialect": "sqlite",
+      "command": "python",
+      "args": ["${DLC_ROOT}/mcp-servers/sqlite/server.py"],
+      "env": { "SQLITE_DB_PATH": "${DLC_DATA_DIR}/demo.db" }
+    },
+    {
+      "id": "demo-postgres",
+      "name": "Demo shop (PostgreSQL)",
+      "description": "Same synthetic data, served from PostgreSQL via the reference MCP server.",
+      "dialect": "postgresql",
+      "command": "python",
+      "args": ["${DLC_ROOT}/mcp-servers/postgres/server.py"],
+      "env": { "POSTGRES_DSN": "${POSTGRES_DSN}" }
+    }
+  ]
+}

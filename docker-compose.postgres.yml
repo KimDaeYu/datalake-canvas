@@ -1,0 +1,32 @@
+# Overlay that adds a demo PostgreSQL database and registers it as the "demo-postgres" data source.
+#   docker compose -f docker-compose.yml -f docker-compose.postgres.yml up --build
+# Requires POSTGRES_PASSWORD in your .env (see .env.example).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: demo
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      # Same synthetic dataset as the SQLite demo; loaded on first start.
+      - ./examples/demo-data/demo.sql:/docker-entrypoint-initdb.d/demo.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo -d demo"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    environment:
+      DLC_DATASOURCES_FILE: /app/config/datasources.postgres.example.json
+      # Interpolated into the datasource config at startup; never written to a file.
+      POSTGRES_DSN: postgresql://demo:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/demo
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

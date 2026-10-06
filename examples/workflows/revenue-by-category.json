@@ -1,0 +1,37 @@
+{
+  "name": "Revenue by product category (demo)",
+  "nodes": [
+    {
+      "id": "ds",
+      "type": "data_source",
+      "position": { "x": 0, "y": 80 },
+      "data": { "label": "Demo shop", "datasource_id": "demo-sqlite" }
+    },
+    {
+      "id": "q",
+      "type": "query",
+      "position": { "x": 300, "y": 80 },
+      "data": {
+        "label": "Revenue per category",
+        "sql": "SELECT p.category, ROUND(SUM(p.price * o.quantity), 2) AS revenue FROM orders o JOIN products p ON p.id = o.product_id GROUP BY p.category"
+      }
+    },
+    {
+      "id": "t",
+      "type": "transform",
+      "position": { "x": 640, "y": 80 },
+      "data": { "label": "Highest first", "operation": "sort", "column": "revenue", "descending": true }
+    },
+    {
+      "id": "c",
+      "type": "chart",
+      "position": { "x": 980, "y": 80 },
+      "data": { "label": "Revenue chart", "chart_type": "bar", "x": "category", "y": "revenue" }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "ds", "target": "q" },
+    { "id": "e2", "source": "q", "target": "t" },
+    { "id": "e3", "source": "t", "target": "c" }
+  ]
+}

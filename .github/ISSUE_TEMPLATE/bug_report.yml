@@ -1,0 +1,48 @@
+name: Bug report
+description: Something is broken or behaves unexpectedly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Do not include API keys, connection strings or private data.**
+        For security vulnerabilities, please follow the SECURITY.md file in the repository instead of opening an issue.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. docker compose up
+        2. Import examples/workflows/...
+        3. Click Run
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Canvas / UI, Backend API, Workflow executor, Agent / LLM, MCP client or server, Docker / setup, Docs, Other]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: OS, browser, Docker version, how you run the project, data source type.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Backend logs or browser console output (remove secrets first).
+      render: shell
