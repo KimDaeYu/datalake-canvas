@@ -14,6 +14,18 @@ server.
 
 It is aimed at analysts and research labs whose data is growing but who have no dedicated data engineer.
 
+## Screenshots
+
+A workflow on the bundled demo dataset: data source → query → chart, with per-node run status
+and the selected node's output on the right.
+
+![Canvas with a data source, query and chart node; the chart output is shown in the side panel](docs/images/canvas.png)
+
+Describe what you want in plain language; the agent drafts a read-only query (checked by the safety
+guard) that you review and add to the canvas.
+
+![Natural-language prompt producing a SQL query with an Add to canvas button](docs/images/natural-language.png)
+
 ## Why
 
 Two families of tools sit on either side of a gap:
