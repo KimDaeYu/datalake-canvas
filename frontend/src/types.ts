@@ -85,6 +85,17 @@ export interface DataSourceInfo {
   dialect: string;
 }
 
+export interface ColumnInfo {
+  name: string;
+  type?: string;
+  [key: string]: unknown;
+}
+
+export interface TableInfo {
+  name: string;
+  columns: ColumnInfo[];
+}
+
 export interface Health {
   status: string;
   version: string;

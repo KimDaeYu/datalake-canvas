@@ -3,6 +3,7 @@ import type {
   Health,
   PlanResponse,
   RunResult,
+  TableInfo,
   Workflow,
   WorkflowPayload,
   WorkflowSummary,
@@ -50,6 +51,8 @@ const json = (body: unknown): RequestInit => ({ body: JSON.stringify(body) });
 export const api = {
   health: () => request<Health>("/health"),
   listDatasources: () => request<DataSourceInfo[]>("/datasources"),
+  getSchema: (datasourceId: string) =>
+    request<TableInfo[]>(`/datasources/${encodeURIComponent(datasourceId)}/schema`),
   listWorkflows: () => request<WorkflowSummary[]>("/workflows"),
   getWorkflow: (id: string) => request<Workflow>(`/workflows/${id}`),
   createWorkflow: (wf: WorkflowPayload) =>

@@ -1,5 +1,7 @@
+import { appendToSql } from "../lib/workflow";
 import type { CanvasNode, DataSourceInfo, NodeResult, PlanResponse } from "../types";
 import { NodeConfig } from "./NodeConfig";
+import { SchemaBrowser } from "./SchemaBrowser";
 import { PromptBox } from "./PromptBox";
 import { ResultView } from "./ResultView";
 
@@ -23,6 +25,16 @@ export function SidePanel({
   return (
     <aside className="flex w-96 shrink-0 flex-col gap-6 overflow-y-auto border-l border-slate-200 bg-white p-4">
       <PromptBox datasources={datasources} llmConfigured={llmConfigured} onAddPlan={onAddPlan} />
+      <hr className="border-slate-200" />
+      <SchemaBrowser
+        datasources={datasources}
+        selected={selected}
+        onInsert={(name) => {
+          if (selected?.type === "query") {
+            onChange(selected.id, { sql: appendToSql(String(selected.data.sql ?? ""), name) });
+          }
+        }}
+      />
       <hr className="border-slate-200" />
       {selected ? (
         <>
