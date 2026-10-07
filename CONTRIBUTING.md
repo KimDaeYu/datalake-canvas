@@ -45,7 +45,7 @@ auto-fixes formatting.
 | --- | --- | --- |
 | Backend | `backend/datalake_canvas/` | FastAPI, executor, safety guard, MCP client, agent |
 | Frontend | `frontend/src/` | React Flow canvas, side panel, API client |
-| MCP servers | `mcp-servers/` | Reference servers (PostgreSQL, SQLite) |
+| MCP servers | `mcp-servers/` | Reference servers (PostgreSQL, SQLite, MySQL) |
 | Docs | `docs/` | Architecture, adding data sources |
 
 See [`docs/architecture.md`](docs/architecture.md) for the big picture and
