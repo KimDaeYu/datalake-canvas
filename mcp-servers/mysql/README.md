@@ -37,12 +37,20 @@ you run the server standalone.
 * `run_select` accepts only statements starting with `SELECT`, `WITH` or `VALUES`.
 * Multi-statement support is off, so `SELECT 1; DELETE ...` is a syntax error.
 * Locking reads (`SELECT ... FOR UPDATE`) are rejected by the read-only transaction.
+* Statements containing an `INTO` keyword outside strings, quoted identifiers and comments are
+  rejected by the server (`INTO OUTFILE`, `INTO DUMPFILE` and `INTO @variable`), and so are
+  executable comments (`/*! ... */`).
 
 ### Known limits
 
 * A read-only transaction does **not** stop server-side file writes such as
-  `SELECT ... INTO OUTFILE`. Use a MySQL user without the `FILE` privilege and keep
-  `secure_file_priv` restrictive. (The backend's SQL guard also blocks `INTO`.)
+  `SELECT ... INTO OUTFILE`. The server now rejects them, but the check is a text scan, not a
+  parser, so keep using a MySQL user without the `FILE` privilege and a restrictive
+  `secure_file_priv`.
+* A column or table literally named `into` must be backtick-quoted (an unquoted `t.into` or
+  `@into` is rejected too). A string that contains a backslash-escaped quote together with the
+  word `into` (for example `'O\'Brien went into the shop'`) can be rejected; write the quote as
+  `''` instead of `\'` in that case.
 * Named locks (`GET_LOCK`) are allowed; they are released when the connection closes.
 * The default TLS connection encrypts traffic but does not verify the server certificate, so
   prefer a trusted network.

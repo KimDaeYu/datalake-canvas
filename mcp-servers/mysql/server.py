@@ -14,7 +14,9 @@ Configuration (environment):
   MYSQL_STATEMENT_TIMEOUT_MS  statement timeout, default 30000
 
 Safety: every query runs inside a READ ONLY transaction, so even a query that slips past the
-checks below cannot modify data. Use a MySQL user with SELECT-only grants too.
+checks below cannot modify data. A READ ONLY transaction does not stop server-side file writes,
+so run_select also rejects the INTO keyword (SELECT ... INTO OUTFILE/DUMPFILE). That check is a
+text scan, not a parser: still use a MySQL user with SELECT-only grants and no FILE privilege.
 PyMySQL is imported lazily so the pure helpers can be tested without it installed.
 Run over stdio:  python server.py
 """
@@ -45,6 +47,76 @@ def _require_read_only_start(sql: str) -> str:
     if not _READ_START.match(sql, pos):
         raise ValueError("Only SELECT / WITH / VALUES queries are allowed")
     return sql.strip().rstrip(";").rstrip()
+
+
+_WORD = re.compile(r"[\w$]+")
+
+
+class _Unterminated(ValueError):
+    pass
+
+
+def _scan(sql: str, backslash_escapes: bool) -> str | None:
+    """Return "INTO" or "EXEC_COMMENT" for the first finding outside literals, else None."""
+    i, n = 0, len(sql)
+    while i < n:
+        c = sql[i]
+        if c in "'\"`":
+            j = i + 1
+            while True:
+                if j >= n:
+                    raise _Unterminated("Unterminated quoted string or identifier")
+                if sql[j] == c:
+                    if j + 1 < n and sql[j + 1] == c:  # doubled quote = escaped quote
+                        j += 2
+                        continue
+                    break
+                # A backslash escapes the next character (strings only, never backticks).
+                j += 2 if c != "`" and backslash_escapes and sql[j] == "\\" else 1
+            i = j + 1
+        # "--" is a comment only before whitespace / a control character (<= " ") or the end.
+        elif c == "#" or (sql.startswith("--", i) and (i + 2 == n or sql[i + 2] <= " ")):
+            j = sql.find("\n", i)
+            i = n if j == -1 else j + 1
+        elif sql.startswith("/*", i):
+            if sql.startswith(("/*!", "/*M!"), i):  # MySQL / MariaDB execute the content
+                return "EXEC_COMMENT"
+            j = sql.find("*/", i + 2)
+            if j == -1:
+                raise _Unterminated("Unterminated comment")
+            i = j + 2
+        elif m := _WORD.match(sql, i):
+            if m.group().lower() == "into":
+                return "INTO"
+            i = m.end()
+        else:
+            i += 1
+    return None
+
+
+def _reject_into(sql: str) -> None:
+    """Reject SELECT ... INTO (OUTFILE, DUMPFILE or variables): a READ ONLY transaction still
+    lets them write files on the server. Like the backend guard, this is a text scan, not a
+    parser, so names such as t.into or @into are rejected too; backtick-quote them (`into`).
+    """
+    # The server's sql_mode may include NO_BACKSLASH_ESCAPES, which changes where strings end,
+    # so the text is scanned under both readings and a finding in either one rejects it. A
+    # reading that cannot terminate is not how MySQL parses the text, so it only matters when
+    # both fail: SELECT 'a\'b' is unterminated without escapes but valid in the default mode.
+    outcomes, errors = [], []
+    for escapes in (True, False):
+        try:
+            outcomes.append(_scan(sql, escapes))
+        except _Unterminated as exc:
+            errors.append(exc)
+    if "INTO" in outcomes:
+        raise ValueError(
+            "INTO is not allowed (SELECT ... INTO OUTFILE/DUMPFILE/variable is blocked)"
+        )
+    if "EXEC_COMMENT" in outcomes:
+        raise ValueError("Executable comments /*! ... */ are not supported")
+    if len(errors) == 2:
+        raise errors[0]
 
 
 def _required_env(name: str) -> str:
@@ -190,6 +262,7 @@ def run_select(sql: str, max_rows: int = 1000) -> dict[str, Any]:
 
     max_rows = max(1, min(int(max_rows), 10_000))
     sql = _require_read_only_start(sql)
+    _reject_into(sql)
     # Not wrapped in a derived table: MySQL rejects duplicate column names there (e.g. a join
     # returning two `id` columns), so the user's SQL runs as is.
     with _connection() as conn:
