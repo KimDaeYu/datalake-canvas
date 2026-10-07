@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PlanResponse } from "../types";
 import {
+  appendToSql,
   createNode,
   fromPayload,
   parseWorkflowJson,
@@ -79,5 +80,13 @@ describe("planToNodes", () => {
 
   it("omits the chart when none is suggested", () => {
     expect(planToNodes(plan(null), { x: 0, y: 0 }).nodes).toHaveLength(2);
+  });
+});
+
+describe("appendToSql", () => {
+  it("appends with a separating space only when needed", () => {
+    expect(appendToSql("", "orders")).toBe("orders");
+    expect(appendToSql("SELECT * FROM", "orders")).toBe("SELECT * FROM orders");
+    expect(appendToSql("SELECT * FROM ", "orders")).toBe("SELECT * FROM orders");
   });
 });

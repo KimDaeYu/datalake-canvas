@@ -180,3 +180,9 @@ export function starterWorkflow(): { nodes: CanvasNode[]; edges: CanvasEdge[] } 
     ],
   };
 }
+
+/** Appends an identifier to SQL, separated by a space unless the SQL is empty or already ends in whitespace. */
+export function appendToSql(sql: string, identifier: string): string {
+  if (!sql || /\s$/.test(sql)) return sql + identifier;
+  return `${sql} ${identifier}`;
+}
