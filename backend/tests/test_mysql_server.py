@@ -138,6 +138,30 @@ def test_reject_into_blocks(server, sql, message):
         server._reject_into(sql)
 
 
+# sql_mode can change where a quoted token ends, so the scan reads each statement twice (backslash
+# as an escape, and not). These inputs need the reading that matches the server's mode: each one is
+# invisible to one reading and caught by the other.
+# ANSI_QUOTES: "..." is an identifier and a backslash inside it is NOT an escape.
+ANSI_QUOTES_SQL = r"""SELECT "a\" INTO OUTFILE '/tmp/x' -- " """
+# NO_BACKSLASH_ESCAPES: a backslash inside '...' is an ordinary character.
+NO_BACKSLASH_SQL = r"SELECT 'a\' INTO OUTFILE '/tmp/x' -- '"
+
+
+@pytest.mark.parametrize("sql", [ANSI_QUOTES_SQL, NO_BACKSLASH_SQL])
+def test_reject_into_catches_sql_mode_dependent_quoting(server, sql):
+    with pytest.raises(ValueError, match=INTO_MSG):
+        server._reject_into(sql)
+
+
+@pytest.mark.parametrize("sql", [ANSI_QUOTES_SQL, NO_BACKSLASH_SQL])
+def test_each_single_reading_misses_a_sql_mode_case(server, sql):
+    # Regression guard for the double scan: reading with backslash escapes hides the INTO inside
+    # what it takes for a string, the reading without escapes finds it. Scanning only once (for
+    # example after pinning NO_BACKSLASH_ESCAPES in the session) would reopen the ANSI_QUOTES case.
+    assert server._scan(sql, True) is None
+    assert server._scan(sql, False) == "INTO"
+
+
 @pytest.mark.parametrize("sql", ["SELECT 'abc", "SELECT `abc", 'SELECT "abc', "SELECT 1 /* x"])
 def test_reject_into_unterminated(server, sql):
     with pytest.raises(ValueError, match=r"^Unterminated"):
