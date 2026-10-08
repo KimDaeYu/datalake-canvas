@@ -1,3 +1,5 @@
+import { getShortcutAction } from "./lib/shortcuts";
+
 import {
   addEdge,
   Background,
@@ -154,6 +156,24 @@ function Canvas() {
     );
   });
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const action = getShortcutAction(event);
+      if (!action || busy || event.repeat) return;
+
+      event.preventDefault();
+
+      if (action === "save") {
+        void onSave();
+      } else {
+        void onRun();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [busy, onSave, onRun]);
+
   const onOpen = (id: string) =>
     guarded(async () => {
       if (id) load(await api.getWorkflow(id), id);
@@ -225,13 +245,19 @@ function Canvas() {
           <button className={buttonClass} onClick={onExport}>
             Export JSON
           </button>
-          <button className={buttonClass} disabled={busy} onClick={() => void onSave()}>
+          <button
+            className={buttonClass}
+            disabled={busy}
+            onClick={() => void onSave()}
+            title="Save (Ctrl+S / Cmd+S)"
+          >
             Save
           </button>
           <button
             className="rounded bg-emerald-600 px-3 py-1 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
             disabled={busy}
             onClick={() => void onRun()}
+            title="Run (Ctrl+Enter / Cmd+Enter)"
           >
             {busy ? "Working…" : "Run"}
           </button>
