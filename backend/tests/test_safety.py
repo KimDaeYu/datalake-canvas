@@ -192,6 +192,36 @@ def test_a_quote_that_only_one_reading_can_close_is_not_an_error():
     check_sql(r"SELECT 'a\'b' AS s", dialect=None)
 
 
+# --- explaining the strict treatment of unknown dialects ------------------------------
+
+
+def test_rejections_for_unmodelled_dialects_say_how_to_relax_the_check():
+    with pytest.raises(SafetyViolation) as exc:
+        check_sql("DROP TABLE t", dialect="duckdb")
+    msg = str(exc.value)
+    assert "DROP" in msg  # the real reason comes first
+    assert "'duckdb' is not modelled" in msg and "set the data source's `dialect`" in msg
+
+
+def test_missing_dialect_is_described_differently():
+    with pytest.raises(SafetyViolation, match="no dialect was given"):
+        check_sql("DROP TABLE t")
+
+
+@pytest.mark.parametrize("dialect", ["postgresql", "postgres", "sqlite", "mysql", "MariaDB"])
+def test_rejections_for_modelled_dialects_have_no_extra_hint(dialect):
+    with pytest.raises(SafetyViolation) as exc:
+        check_sql("DROP TABLE t", dialect=dialect)
+    assert "dialect" not in str(exc.value)
+
+
+def test_unterminated_rejection_also_carries_the_hint_and_keeps_its_type():
+    from datalake_canvas.safety import _Unterminated
+
+    with pytest.raises(_Unterminated, match="not modelled"):
+        check_sql("SELECT 'abc", dialect="duckdb")
+
+
 # --- the guard class and its call sites ------------------------------------------------
 
 

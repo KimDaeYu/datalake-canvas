@@ -92,10 +92,27 @@ _ALIASES = {
 _ALL_READINGS: tuple[_Rules, ...] = (_POSTGRESQL, _SQLITE, _MYSQL_ESCAPES, _MYSQL)
 
 
+def _normalize(dialect: str | None) -> str:
+    key = (dialect or "").strip().lower()
+    return _ALIASES.get(key, key)
+
+
 def _readings(dialect: str | None) -> tuple[_Rules, ...]:
     """The lexing rules a statement must satisfy for this dialect (all of them if unknown)."""
-    key = (dialect or "").strip().lower()
-    return _BY_DIALECT.get(_ALIASES.get(key, key), _ALL_READINGS)
+    return _BY_DIALECT.get(_normalize(dialect), _ALL_READINGS)
+
+
+def _unmodelled_hint(dialect: str | None) -> str:
+    """How to relax the check, appended to rejections made under the strictest (all) readings."""
+    if _normalize(dialect) in _BY_DIALECT:
+        return ""
+    which = (
+        f"data source dialect {dialect!r} is not modelled" if dialect else "no dialect was given"
+    )
+    return (
+        f" ({which}, so the strictest reading is applied; set the data source's `dialect` to a"
+        " similar engine (postgresql, sqlite or mysql) to relax this check)"
+    )
 
 
 def _strip_literals(sql: str, rules: _Rules) -> str:
@@ -213,10 +230,9 @@ def check_sql(sql: str, *, allow_write: bool = False, dialect: str | None = None
     # Any reading that sees a problem rejects the statement. A reading in which a quote never
     # closes is not how the engine parses the text (it would be a syntax error there), so it only
     # counts when no reading could make sense of the statement at all.
-    if violation is not None:
-        raise violation
-    if len(unterminated) == len(readings):
-        raise unterminated[0]
+    rejection = violation or (unterminated[0] if len(unterminated) == len(readings) else None)
+    if rejection is not None:
+        raise type(rejection)(f"{rejection}{_unmodelled_hint(dialect)}") from None
 
 
 @dataclass(frozen=True)
