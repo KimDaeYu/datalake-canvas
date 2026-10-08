@@ -32,7 +32,10 @@ SQL and add it to the canvas as nodes.
 
 1. **Backend guard** (`safety.py`): single statement, `SELECT`/`WITH`/`VALUES` only, destructive/DDL
    keywords blocked, literals and comments ignored. Disabled only by `DLC_ALLOW_WRITE_QUERIES=true`.
-2. **MCP server**: checks the statement prefix and opens the database read-only.
+   It applies PostgreSQL/ANSI lexing rules and is not dialect-aware, so engines that lex differently
+   (e.g. MySQL) can read a statement differently from the guard.
+2. **MCP server**: checks the statement prefix, opens the database read-only, and adds checks specific
+   to its engine where needed. This layer is what covers each engine's own syntax.
 3. **Database role**: use `SELECT`-only grants. The first two layers are heuristics, this one is a guarantee.
 
 ## Extension points

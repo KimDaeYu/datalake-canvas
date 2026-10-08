@@ -105,7 +105,9 @@ make frontend     # terminal 2: http://localhost:5173
 
 Queries are read-only by default: a backend guard rejects write/DDL statements, the reference MCP
 servers open read-only connections, and you should connect with a `SELECT`-only database role. The guard
-is defense in depth, not a SQL parser. Details and limits are in [SECURITY.md](SECURITY.md).
+is defense in depth, not a SQL parser, and it is not dialect-aware (it applies PostgreSQL/ANSI lexing
+rules), so each MCP server also enforces read-only access for its own engine. Details and limits are in
+[SECURITY.md](SECURITY.md).
 
 ## Project layout
 
