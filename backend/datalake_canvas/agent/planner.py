@@ -54,5 +54,7 @@ class QueryPlanner:
         plan = await self.provider.plan_query(request)
         # Never trust model output: report whether the guard would let it run.
         return PlanResponse(
-            datasource_id=datasource_id, plan=plan, safety=self.guard.check(plan.sql)
+            datasource_id=datasource_id,
+            plan=plan,
+            safety=self.guard.check(plan.sql, dialect=spec.dialect),
         )
