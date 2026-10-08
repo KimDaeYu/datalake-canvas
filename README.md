@@ -14,6 +14,18 @@ server.
 
 It is aimed at analysts and research labs whose data is growing but who have no dedicated data engineer.
 
+## Screenshots
+
+A workflow on the bundled demo dataset: data source → query → chart, with per-node run status
+and the selected node's output on the right.
+
+![Canvas with a data source, query and chart node; the chart output is shown in the side panel](docs/images/canvas.png)
+
+Describe what you want in plain language; the agent drafts a read-only query (checked by the safety
+guard) that you review and add to the canvas.
+
+![Natural-language prompt producing a SQL query with an Add to canvas button](docs/images/natural-language.png)
+
 ## Why
 
 Two families of tools sit on either side of a gap:
@@ -52,7 +64,7 @@ More detail in [docs/architecture.md](docs/architecture.md).
 | ✅ Implemented | Save/load workflows on the server, and import/export as JSON |
 | ✅ Implemented | Read-only SQL guard (blocks DROP/DELETE/UPDATE/ALTER/TRUNCATE and more unless explicitly enabled) |
 | ✅ Implemented | MCP client with a pluggable data source registry (JSON config) |
-| ✅ Implemented | Reference MCP servers: SQLite (demo) and PostgreSQL |
+| ✅ Implemented | Reference MCP servers: SQLite (demo), PostgreSQL and MySQL |
 | ✅ Implemented | Natural language → reviewable SQL plan via the OpenAI Agents SDK (needs your own API key; untested against the live API in CI) |
 | ✅ Implemented | Provider interface (`LLMProvider`) so other LLM vendors can be added |
 | 🚧 Planned | Additional LLM providers (e.g. Anthropic) |
@@ -60,7 +72,7 @@ More detail in [docs/architecture.md](docs/architecture.md).
 | 🚧 Planned | More transforms (group/aggregate, join, pivot) and richer charts |
 | 🚧 Planned | Scheduled/automated re-runs, run history |
 | 🚧 Planned | Authentication, multi-user workspaces, sharing |
-| 🚧 Planned | More connectors (MySQL, BigQuery, files/Parquet) |
+| 🚧 Planned | More connectors (BigQuery, files/Parquet) |
 
 ## Quickstart (Docker, SQLite demo)
 
@@ -93,14 +105,16 @@ make frontend     # terminal 2: http://localhost:5173
 
 Queries are read-only by default: a backend guard rejects write/DDL statements, the reference MCP
 servers open read-only connections, and you should connect with a `SELECT`-only database role. The guard
-is defense in depth, not a SQL parser. Details and limits are in [SECURITY.md](SECURITY.md).
+is defense in depth, not a SQL parser, and it is not dialect-aware (it applies PostgreSQL/ANSI lexing
+rules), so each MCP server also enforces read-only access for its own engine. Details and limits are in
+[SECURITY.md](SECURITY.md).
 
 ## Project layout
 
 ```
 backend/       FastAPI app, executor, safety guard, MCP client, agent layer, tests
 frontend/      React + TypeScript + Vite + Tailwind canvas UI
-mcp-servers/   Reference MCP servers (postgres, sqlite)
+mcp-servers/   Reference MCP servers (postgres, sqlite, mysql)
 examples/      Demo dataset and example workflows
 config/        Data source registry files
 docs/          Architecture, adding data sources, good first issues

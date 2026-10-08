@@ -1,0 +1,28 @@
+{
+  "datasources": [
+    {
+      "id": "demo-sqlite",
+      "name": "Demo shop (SQLite)",
+      "description": "Synthetic online-shop data: customers, products, orders.",
+      "dialect": "sqlite",
+      "command": "python",
+      "args": ["${DLC_ROOT}/mcp-servers/sqlite/server.py"],
+      "env": { "SQLITE_DB_PATH": "${DLC_DATA_DIR}/demo.db" }
+    },
+    {
+      "id": "demo-mysql",
+      "name": "Demo shop (MySQL)",
+      "description": "A MySQL database served read-only via the reference MCP server.",
+      "dialect": "mysql",
+      "command": "python",
+      "args": ["${DLC_ROOT}/mcp-servers/mysql/server.py"],
+      "env": {
+        "MYSQL_HOST": "${MYSQL_HOST}",
+        "MYSQL_PORT": "${MYSQL_PORT}",
+        "MYSQL_USER": "${MYSQL_USER}",
+        "MYSQL_PASSWORD": "${MYSQL_PASSWORD}",
+        "MYSQL_DATABASE": "${MYSQL_DATABASE}"
+      }
+    }
+  ]
+}
