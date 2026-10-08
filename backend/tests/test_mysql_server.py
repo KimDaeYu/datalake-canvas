@@ -66,6 +66,84 @@ def test_require_read_only_start_rejects(server, sql):
         server._require_read_only_start(sql)
 
 
+# Raw strings below: the SQL text contains exactly one backslash where r"...\'..." shows one.
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT 1",
+        "SELECT 'into outfile' AS s",
+        'SELECT "into" AS s',
+        "SELECT `into` FROM t",
+        "SELECT into_x, x_into, into1 FROM t",
+        "SELECT 1 -- INTO OUTFILE '/x'",
+        "SELECT 1 --",  # comment at the very end of the input
+        "SELECT 1 # INTO OUTFILE '/x'",
+        "SELECT /* INTO */ 1",
+        "SELECT /*+ NO_ICP(t) */ 1 FROM t",  # an ordinary optimizer hint
+        "SELECT 'it''s into' AS s",
+        r"SELECT 'a\'b' AS s",  # backslash-escaped quote, valid in the default sql_mode
+        # Terminates only when backslashes are NOT escapes; allowed because the other reading
+        # (unterminated) cannot be how MySQL parses it.
+        r"SELECT 'C:\dir\' AS p",
+        "SELECT 1--1",  # no space after the dashes: arithmetic, no comment, no INTO
+    ],
+)
+def test_reject_into_allows(server, sql):
+    server._reject_into(sql)
+
+
+INTO_MSG = "INTO is not allowed"
+EXEC_MSG = "Executable comments"
+
+
+@pytest.mark.parametrize(
+    ("sql", "message"),
+    [
+        ("SELECT 1 INTO OUTFILE '/tmp/x'", INTO_MSG),
+        ("select 1 into dumpfile '/tmp/x'", INTO_MSG),
+        ("SELECT 1\nINTO\tOUTFILE '/tmp/x'", INTO_MSG),
+        ("SELECT * FROM t INTO OUTFILE '/tmp/x'", INTO_MSG),
+        ("SELECT 1 INTO /* c */ OUTFILE '/tmp/x'", INTO_MSG),
+        ("SELECT 1 /* c */ INTO OUTFILE '/tmp/x'", INTO_MSG),
+        ("SELECT 1 -- c\nINTO OUTFILE '/tmp/x'", INTO_MSG),  # a line comment ends at the newline
+        ("SELECT 1 # c\nINTO OUTFILE '/tmp/x'", INTO_MSG),
+        ("WITH x AS (SELECT 1) SELECT * FROM x INTO OUTFILE '/tmp/x'", INTO_MSG),
+        ("SELECT 1 UNION SELECT 2 INTO OUTFILE '/tmp/x'", INTO_MSG),
+        # Deliberately blocked (text scan, see _reject_into): backtick-quote such names instead.
+        ("SELECT 1 INTO @v", INTO_MSG),
+        ("SELECT t.into FROM t", INTO_MSG),
+        ("SELECT @into", INTO_MSG),
+        # MySQL-specific lexing: backslash escapes, "--" needs a following
+        # space, "#" comments and executable comments
+        # \' is an escaped quote in MySQL, so INTO is live; the final "-- " starts a comment
+        (r"SELECT 'a\'' INTO OUTFILE '/tmp/x' -- '", INTO_MSG),
+        # "--1" is arithmetic in MySQL, not a comment
+        ("SELECT 1 --1 INTO OUTFILE '/tmp/x'", INTO_MSG),
+        # MySQL executes the content of /*! ... */
+        ("SELECT 1 /*!50000 INTO OUTFILE '/tmp/x' */", EXEC_MSG),
+        # MySQL executes the content of /*! ... */
+        ("SELECT 1 /*! INTO OUTFILE '/tmp/x' */", EXEC_MSG),
+        # MariaDB form of an executable comment
+        ("SELECT 1 /*M!100100 INTO OUTFILE '/tmp/x' */", EXEC_MSG),
+        ("/*!50000 SELECT 1 */ SELECT 2", EXEC_MSG),  # a leading executable comment
+        # With NO_BACKSLASH_ESCAPES the string ends after the backslash and INTO is live.
+        (r"SELECT 'a\' INTO OUTFILE '/tmp/x'", INTO_MSG),
+        # Documented false positive: the conservative no-escapes reading sees INTO outside the
+        # string. Write '' instead of \' to keep such a query.
+        (r"SELECT 'O\'Brien went into the shop' AS s", INTO_MSG),
+    ],
+)
+def test_reject_into_blocks(server, sql, message):
+    with pytest.raises(ValueError, match=message):
+        server._reject_into(sql)
+
+
+@pytest.mark.parametrize("sql", ["SELECT 'abc", "SELECT `abc", 'SELECT "abc', "SELECT 1 /* x"])
+def test_reject_into_unterminated(server, sql):
+    with pytest.raises(ValueError, match=r"^Unterminated"):
+        server._reject_into(sql)
+
+
 UID = uuid.UUID("12345678-1234-5678-1234-567812345678")
 
 
@@ -296,6 +374,29 @@ def test_write_is_rejected_before_connecting(server, fake_pymysql, mysql_env):
     with pytest.raises(ValueError, match="Only SELECT"):
         server.run_select("DELETE FROM t")
     assert fake_pymysql.connect_kwargs == []
+
+
+@pytest.mark.parametrize(
+    ("sql", "message"),
+    [
+        ("SELECT 1 INTO OUTFILE '/tmp/x'", "INTO is not allowed"),
+        ("SELECT 1 /*!50000 INTO OUTFILE '/tmp/x' */", "Executable comments"),
+    ],
+)
+def test_into_is_rejected_before_connecting(server, fake_pymysql, mysql_env, sql, message):
+    with pytest.raises(ValueError, match=message):
+        server.run_select(sql)
+    assert fake_pymysql.connect_kwargs == []
+
+
+def test_into_in_comment_still_runs(server, fake_pymysql, mysql_env):
+    sql = "SELECT 1 -- INTO OUTFILE '/tmp/x'"
+    conn = fake_pymysql.connection = FakeConnection(rows=[(1,)])
+    result = server.run_select(sql)
+
+    assert result == {"columns": ["a"], "rows": [[1]], "truncated": False}
+    assert len(fake_pymysql.connect_kwargs) == 1
+    assert statements(conn)[-1] == sql
 
 
 SECRETS = {"MYSQL_USER": "u-s3cret", "MYSQL_PASSWORD": "p-s3cret", "MYSQL_DATABASE": "d-s3cret"}
