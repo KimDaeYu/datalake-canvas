@@ -14,11 +14,20 @@ describe("toCsv", () => {
 
   it("escapes cells containing commas, quotes, and newlines", () => {
     const columns = ["title", "description"];
-    const rows = [["Hello, World", 'He said "Hi"'] , ["Line 1\nLine 2", null]];
+    const rows = [
+      ["Hello, World", 'He said "Hi"'],
+      ["Line 1\nLine 2", null],
+    ];
     const csv = toCsv(columns, rows);
-    expect(csv).toBe(
-      'title,description\n"Hello, World","He said ""Hi"""\n"Line 1\nLine 2",'
-    );
+    expect(csv).toBe('title,description\n"Hello, World","He said ""Hi"""\n"Line 1\nLine 2",');
+  });
+
+  it("quotes cells containing a carriage return", () => {
+    expect(toCsv(["a"], [["x\ry"]])).toBe('a\n"x\ry"');
+  });
+
+  it("keeps falsy values: 0, false and the empty string are not turned into null", () => {
+    expect(toCsv(["n", "b", "s", "z"], [[0, false, "", null]])).toBe("n,b,s,z\n0,false,,");
   });
 
   it("handles empty rows and columns gracefully", () => {

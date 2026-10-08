@@ -1,4 +1,8 @@
-/** Pure helper to convert columns and rows into RFC 4180 compliant CSV string. */
+/**
+ * Pure helper that converts columns and rows into a CSV string.
+ * Cells are quoted RFC 4180 style (commas, quotes and line breaks; quotes are doubled), null and
+ * undefined become empty cells. Rows are separated by "\n" rather than the RFC's "\r\n".
+ */
 export function toCsv(columns: string[], rows: unknown[][]): string {
   const escapeCell = (cell: unknown): string => {
     if (cell === null || cell === undefined) {
