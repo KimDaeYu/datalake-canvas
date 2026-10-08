@@ -79,7 +79,6 @@ def test_require_read_only_start_rejects(server, sql):
         "SELECT 1 --",  # comment at the very end of the input
         "SELECT 1 # INTO OUTFILE '/x'",
         "SELECT /* INTO */ 1",
-        "SELECT /*+ NO_ICP(t) */ 1 FROM t",  # an ordinary optimizer hint
         "SELECT 'it''s into' AS s",
         r"SELECT 'a\'b' AS s",  # backslash-escaped quote, valid in the default sql_mode
         # Terminates only when backslashes are NOT escapes; allowed because the other reading
@@ -94,6 +93,7 @@ def test_reject_into_allows(server, sql):
 
 INTO_MSG = "INTO is not allowed"
 EXEC_MSG = "Executable comments"
+HINT_MSG = "Optimizer hints"
 
 
 @pytest.mark.parametrize(
@@ -160,6 +160,62 @@ def test_each_single_reading_misses_a_sql_mode_case(server, sql):
     # example after pinning NO_BACKSLASH_ESCAPES in the session) would reopen the ANSI_QUOTES case.
     assert server._scan(sql, True) is None
     assert server._scan(sql, False) == "INTO"
+
+
+# Optimizer hints can lift MAX_EXECUTION_TIME for one statement, so any /*+ ... */ is rejected.
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT /*+ NO_ICP(t) */ 1 FROM t",
+        "SELECT /*+ SET_VAR(max_execution_time=0) */ * FROM t",
+        "SELECT /*+ MAX_EXECUTION_TIME(1000) */ * FROM t",
+        "SELECT/*+ x */1",
+        "/*+ x */ SELECT 1",
+        "SELECT * FROM (SELECT /*+ MAX_EXECUTION_TIME(0) */ a FROM t) AS s",
+        "WITH /*+ x */ c AS (SELECT 1) SELECT * FROM c",
+        "WITH c AS (SELECT /*+ SET_VAR(max_execution_time=0) */ 1) SELECT * FROM c",
+        "SELECT /*+ x",  # unterminated: rejected as a hint before the missing */ matters
+        # Only the reading without backslash escapes ends the string before the hint.
+        r"SELECT 'a\' /*+ MAX_EXECUTION_TIME(0) */ 1 -- '",
+    ],
+)
+def test_reject_into_blocks_optimizer_hints(server, sql):
+    with pytest.raises(ValueError, match=HINT_MSG):
+        server._reject_into(sql)
+
+
+def test_optimizer_hint_message_matches_backend_guard(server):
+    with pytest.raises(ValueError) as exc_info:
+        server._reject_into("SELECT /*+ SET_VAR(max_execution_time=0) */ 1")
+    assert str(exc_info.value) == "Optimizer hints /*+ ... */ are not allowed"
+
+
+@pytest.mark.parametrize(
+    ("sql", "with_escapes", "without_escapes"),
+    [
+        (r"SELECT 'a\' /*+ x */ 1 -- '", None, "HINT"),
+        (r"""SELECT "a\" /*+ x */ 1 -- " """, None, "HINT"),  # ANSI_QUOTES identifier
+    ],
+)
+def test_hint_found_by_one_reading_only(server, sql, with_escapes, without_escapes):
+    assert server._scan(sql, True) == with_escapes
+    assert server._scan(sql, False) == without_escapes
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT '/*+ MAX_EXECUTION_TIME(0) */' AS s",
+        "SELECT `/*+ x */` FROM t",
+        'SELECT "/*+ x */" AS s',
+        "SELECT 1 -- /*+ MAX_EXECUTION_TIME(0) */",
+        "SELECT 1 # /*+ MAX_EXECUTION_TIME(0) */",
+        "SELECT /* +x */ 1",  # not contiguous: an ordinary comment
+        "SELECT /* note /*+ x */ 1",  # "/*+" inside an ordinary comment opens nothing
+    ],
+)
+def test_reject_into_allows_hint_text_outside_hints(server, sql):
+    server._reject_into(sql)
 
 
 @pytest.mark.parametrize("sql", ["SELECT 'abc", "SELECT `abc", 'SELECT "abc', "SELECT 1 /* x"])
@@ -405,6 +461,8 @@ def test_write_is_rejected_before_connecting(server, fake_pymysql, mysql_env):
     [
         ("SELECT 1 INTO OUTFILE '/tmp/x'", "INTO is not allowed"),
         ("SELECT 1 /*!50000 INTO OUTFILE '/tmp/x' */", "Executable comments"),
+        ("SELECT /*+ SET_VAR(max_execution_time=0) */ 1", "Optimizer hints"),
+        ("SELECT /*+ MAX_EXECUTION_TIME(60000) */ 1", "Optimizer hints"),
     ],
 )
 def test_into_is_rejected_before_connecting(server, fake_pymysql, mysql_env, sql, message):

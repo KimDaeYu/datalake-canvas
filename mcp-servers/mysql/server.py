@@ -15,8 +15,10 @@ Configuration (environment):
 
 Safety: every query runs inside a READ ONLY transaction, so even a query that slips past the
 checks below cannot modify data. A READ ONLY transaction does not stop server-side file writes,
-so run_select also rejects the INTO keyword (SELECT ... INTO OUTFILE/DUMPFILE). That check is a
-text scan, not a parser: still use a MySQL user with SELECT-only grants and no FILE privilege.
+so run_select also rejects the INTO keyword (SELECT ... INTO OUTFILE/DUMPFILE). It rejects
+optimizer hints /*+ ... */ too, since they can lift MAX_EXECUTION_TIME for one statement. These
+checks are a text scan, not a parser: still use a MySQL user with SELECT-only grants and no FILE
+privilege.
 PyMySQL is imported lazily so the pure helpers can be tested without it installed.
 Run over stdio:  python server.py
 """
@@ -57,7 +59,7 @@ class _Unterminated(ValueError):
 
 
 def _scan(sql: str, backslash_escapes: bool) -> str | None:
-    """Return "INTO" or "EXEC_COMMENT" for the first finding outside literals, else None."""
+    """Return "INTO", "EXEC_COMMENT" or "HINT" for the first finding outside literals, else None."""
     i, n = 0, len(sql)
     while i < n:
         c = sql[i]
@@ -81,6 +83,11 @@ def _scan(sql: str, backslash_escapes: bool) -> str | None:
         elif sql.startswith("/*", i):
             if sql.startswith(("/*!", "/*M!"), i):  # MySQL / MariaDB execute the content
                 return "EXEC_COMMENT"
+            # Optimizer hints can override the session's MAX_EXECUTION_TIME for one statement
+            # (MAX_EXECUTION_TIME(n), SET_VAR(max_execution_time=0)). Only "/*+" with no space
+            # is a hint; "/* +" is an ordinary comment.
+            if sql.startswith("/*+", i):
+                return "HINT"
             j = sql.find("*/", i + 2)
             if j == -1:
                 raise _Unterminated("Unterminated comment")
@@ -98,6 +105,7 @@ def _reject_into(sql: str) -> None:
     """Reject SELECT ... INTO (OUTFILE, DUMPFILE or variables): a READ ONLY transaction still
     lets them write files on the server. Like the backend guard, this is a text scan, not a
     parser, so names such as t.into or @into are rejected too; backtick-quote them (`into`).
+    Executable comments and optimizer hints are rejected as well (see _scan).
     """
     # The server's sql_mode may include NO_BACKSLASH_ESCAPES, which changes where strings end,
     # so the text is scanned under both readings and a finding in either one rejects it. A
@@ -115,6 +123,8 @@ def _reject_into(sql: str) -> None:
         )
     if "EXEC_COMMENT" in outcomes:
         raise ValueError("Executable comments /*! ... */ are not supported")
+    if "HINT" in outcomes:
+        raise ValueError("Optimizer hints /*+ ... */ are not allowed")
     if len(errors) == 2:
         raise errors[0]
 
