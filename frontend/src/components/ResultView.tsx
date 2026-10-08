@@ -1,11 +1,38 @@
 import type { NodeResult, TableData } from "../types";
 import { SimpleChart } from "./SimpleChart";
+import { toCsv } from "../lib/csv";
 
 const MAX_ROWS = 100;
 
 function Table({ table }: { table: TableData }) {
+  const handleDownloadCsv = () => {
+    const csvString = toCsv(table.columns, table.rows);
+    const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "table_result.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div>
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-[11px] text-slate-500">
+          {table.rows.length} row{table.rows.length === 1 ? "" : "s"}
+          {table.rows.length > MAX_ROWS && ` (showing first ${MAX_ROWS})`}
+          {table.truncated && " · truncated by the row limit"}
+        </p>
+        <button
+          onClick={handleDownloadCsv}
+          className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-200 transition-colors"
+        >
+          Download CSV
+        </button>
+      </div>
       <div className="max-h-72 overflow-auto rounded border border-slate-200">
         <table className="w-full text-left text-xs">
           <thead className="sticky top-0 bg-slate-50">
@@ -30,11 +57,6 @@ function Table({ table }: { table: TableData }) {
           </tbody>
         </table>
       </div>
-      <p className="mt-1 text-[11px] text-slate-500">
-        {table.rows.length} row{table.rows.length === 1 ? "" : "s"}
-        {table.rows.length > MAX_ROWS && ` (showing first ${MAX_ROWS})`}
-        {table.truncated && " · truncated by the row limit"}
-      </p>
     </div>
   );
 }
