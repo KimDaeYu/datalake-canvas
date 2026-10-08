@@ -14,7 +14,9 @@ A server must expose these tools and return JSON objects:
 | `run_select` | `sql: str`, `max_rows: int` | `{"columns": ["a"], "rows": [[1]], "truncated": false}` |
 
 Values in `rows` must be JSON-serializable (stringify dates, decimals, UUIDs). Enforce read-only
-access **in the server** (read-only connection / role), not only in the backend. See
+access **in the server** (read-only connection / role), not only in the backend. The backend guard
+applies PostgreSQL/ANSI lexing rules, so do not assume it understands your engine's syntax: reject
+unsafe constructs in the server using your engine's own rules. See
 [`mcp-servers/postgres/server.py`](../mcp-servers/postgres/server.py),
 [`mcp-servers/mysql/server.py`](../mcp-servers/mysql/server.py) and
 [`mcp-servers/sqlite/server.py`](../mcp-servers/sqlite/server.py) for short examples built on the

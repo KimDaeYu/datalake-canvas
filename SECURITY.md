@@ -24,7 +24,11 @@ Only the latest commit on `main` is supported until a first release is tagged.
   configured data source.
 * **Read-only by default.** The backend's SQL guard (`backend/datalake_canvas/safety.py`) blocks
   non-`SELECT` statements and multi-statement input. It is defense in depth, **not a SQL parser**,
-  and should not be your only control.
+  and should not be your only control. It also lexes SQL with PostgreSQL/ANSI rules and is **not
+  dialect-aware**: other engines read the same text differently (for example MySQL treats
+  backslashes in strings, `#` comments and `/*! ... */` comments differently), so a statement can
+  pass the guard and still mean something else to the database. Each MCP server therefore has to
+  enforce read-only access for its own engine, and the database role is the real guarantee.
 * **Database-level protection comes from MCP servers.** The reference servers open read-only
   connections. Always connect with a database role that only has `SELECT` grants.
 * **`DLC_ALLOW_WRITE_QUERIES=true` relaxes the backend guard.** It is off by default; enable it only
