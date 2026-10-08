@@ -9,37 +9,38 @@ interface Props {
   onInsert: (tableName: string) => void;
 }
 
-type State =
-  | { status: "idle" | "loading" }
-  | { status: "error"; message: string }
-  | { status: "ok"; tables: TableInfo[] };
+// A fetch result is tagged with the data source it belongs to, so a stale result is never shown.
+type Loaded = { id: string; tables: TableInfo[] } | { id: string; error: string };
 
 /** Lists tables and columns of a data source; clicking a table inserts its name into the selected Query node. */
 export function SchemaBrowser({ datasources, selected, onInsert }: Props) {
   const [picked, setPicked] = useState("");
-  const [state, setState] = useState<State>({ status: "idle" });
-  const [open, setOpen] = useState<Set<string>>(new Set());
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
+  const [expanded, setExpanded] = useState<{ id: string; names: Set<string> }>({
+    id: "",
+    names: new Set(),
+  });
 
   // Follow a selected Data Source node; otherwise keep the manual pick, else the first source.
   const fromNode =
     selected?.type === "data_source" ? String(selected.data.datasource_id ?? "") : "";
   const datasourceId = fromNode || picked || datasources[0]?.id || "";
 
+  // Derived instead of stored: no synchronous setState inside the effect.
+  const current = loaded?.id === datasourceId ? loaded : null;
+  const loading = Boolean(datasourceId) && current === null;
+  const open = expanded.id === datasourceId ? expanded.names : new Set<string>();
+
   useEffect(() => {
-    if (!datasourceId) {
-      setState({ status: "idle" });
-      return;
-    }
+    if (!datasourceId) return;
     let cancelled = false;
-    setState({ status: "loading" });
-    setOpen(new Set());
     api
       .getSchema(datasourceId)
-      .then((tables) => !cancelled && setState({ status: "ok", tables }))
+      .then((tables) => !cancelled && setLoaded({ id: datasourceId, tables }))
       .catch(
         (e) =>
           !cancelled &&
-          setState({ status: "error", message: e instanceof Error ? e.message : String(e) }),
+          setLoaded({ id: datasourceId, error: e instanceof Error ? e.message : String(e) }),
       );
     return () => {
       cancelled = true;
@@ -47,12 +48,11 @@ export function SchemaBrowser({ datasources, selected, onInsert }: Props) {
   }, [datasourceId]);
 
   const canInsert = selected?.type === "query";
-  const toggle = (name: string) =>
-    setOpen((prev) => {
-      const next = new Set(prev);
-      if (!next.delete(name)) next.add(name);
-      return next;
-    });
+  const toggle = (name: string) => {
+    const next = new Set(open);
+    if (!next.delete(name)) next.add(name);
+    setExpanded({ id: datasourceId, names: next });
+  };
 
   return (
     <section className="space-y-2">
@@ -71,10 +71,11 @@ export function SchemaBrowser({ datasources, selected, onInsert }: Props) {
           </option>
         ))}
       </select>
-      {state.status === "loading" && <p className="text-xs text-slate-500">Loading schema…</p>}
-      {state.status === "error" && <p className="text-xs text-red-600">{state.message}</p>}
-      {state.status === "ok" &&
-        (state.tables.length === 0 ? (
+      {loading && <p className="text-xs text-slate-500">Loading schema…</p>}
+      {current && "error" in current && <p className="text-xs text-red-600">{current.error}</p>}
+      {current &&
+        "tables" in current &&
+        (current.tables.length === 0 ? (
           <p className="text-xs text-slate-500">No tables found.</p>
         ) : (
           <>
@@ -84,7 +85,7 @@ export function SchemaBrowser({ datasources, selected, onInsert }: Props) {
                 : "Select a Query node to insert table names."}
             </p>
             <ul className="max-h-56 space-y-1 overflow-y-auto text-sm">
-              {state.tables.map((t) => (
+              {current.tables.map((t) => (
                 <li key={t.name}>
                   <div className="flex items-center gap-1">
                     <button
