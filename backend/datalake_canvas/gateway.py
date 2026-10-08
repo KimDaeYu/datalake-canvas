@@ -51,8 +51,10 @@ class MCPDataGateway:
     async def run_select(
         self, datasource_id: str, sql: str, max_rows: int | None = None
     ) -> TableData:
-        self.guard.validate(sql)  # raises SafetyViolation before anything leaves the process
         spec = self.registry.get(datasource_id)
+        # Read the SQL the way this data source's engine does; raises SafetyViolation before
+        # anything leaves the process.
+        self.guard.validate(sql, dialect=spec.dialect)
         limit = min(max_rows or self.max_rows, self.max_rows)
         data = await self.client.call_tool(spec, "run_select", {"sql": sql, "max_rows": limit})
         try:
