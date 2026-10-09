@@ -29,10 +29,12 @@ class QueryConfig(BaseModel):
 
 
 class TransformConfig(BaseModel):
-    operation: Literal["limit", "select", "sort", "filter"]
+    operation: Literal["limit", "select", "sort", "filter", "aggregate"]
     n: int | None = Field(default=None, ge=0)  # limit
     columns: list[str] | None = None  # select
-    column: str | None = None  # sort / filter
+    column: str | None = None  # sort / filter / aggregate value
+    group_by: str | None = None  # aggregate
+    aggregate_op: Literal["sum", "avg", "count", "min", "max"] | None = None
     descending: bool = False  # sort
     op: Literal["==", "!=", ">", ">=", "<", "<=", "contains"] = "=="  # filter
     value: Any = None  # filter
@@ -118,6 +120,47 @@ def _sorted_rows(rows: list[list[Any]], idx: int, descending: bool) -> list[list
     return present + missing
 
 
+def _aggregate(table: TableData, cfg: TransformConfig) -> tuple[list[list[Any]], list[str]]:
+    try:
+        group_idx = _column_index(table, cfg.group_by)
+    except NodeError:
+        raise NodeError("aggregate requires 'group_by'") from None
+    value_idx = _column_index(table, cfg.column)
+    groups: dict[Any, list[Any]] = {}
+    try:
+        for row in table.rows:
+            groups.setdefault(row[group_idx], []).append(row[value_idx])
+    except TypeError as exc:
+        raise NodeError("The group-by column must contain hashable values") from exc
+
+    aggregated_rows = []
+    for group, values in groups.items():
+        present = [value for value in values if value is not None]
+        if cfg.aggregate_op == "count":
+            result = len(present)
+        elif not present:
+            result = None
+        elif cfg.aggregate_op in ("sum", "avg"):
+            numbers = [_to_number(value) for value in present]
+            if any(number is None for number in numbers):
+                raise NodeError(
+                    f"{cfg.aggregate_op} requires numeric values in column {cfg.column!r}"
+                )
+            total = sum(number for number in numbers if number is not None)
+            result = total if cfg.aggregate_op == "sum" else total / len(numbers)
+        else:
+            try:
+                result = min(present) if cfg.aggregate_op == "min" else max(present)
+            except TypeError as exc:
+                raise NodeError(
+                    f"{cfg.aggregate_op} values in column {cfg.column!r} are not comparable"
+                ) from exc
+        aggregated_rows.append([group, result])
+
+    columns = [table.columns[group_idx], f"{cfg.aggregate_op}_{table.columns[value_idx]}"]
+    return aggregated_rows, columns
+
+
 def apply_transform(table: TableData, cfg: TransformConfig) -> TableData:
     rows, columns = table.rows, table.columns
     if cfg.operation == "limit":
@@ -135,6 +178,10 @@ def apply_transform(table: TableData, cfg: TransformConfig) -> TableData:
     elif cfg.operation == "filter":
         idx = _column_index(table, cfg.column)
         rows = [r for r in rows if _compare(r[idx], cfg.op, cfg.value)]
+    elif cfg.operation == "aggregate":
+        if not cfg.aggregate_op:
+            raise NodeError("aggregate requires 'aggregate_op'")
+        rows, columns = _aggregate(table, cfg)
     return TableData(columns=columns, rows=rows, truncated=table.truncated)
 
 

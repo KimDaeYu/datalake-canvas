@@ -62,6 +62,7 @@ export function NodeConfig({ node, datasources, onChange }: Props) {
               <option value="select">Select columns</option>
               <option value="sort">Sort</option>
               <option value="filter">Filter</option>
+              <option value="aggregate">Aggregate</option>
             </select>
           </Field>
           {d.operation === "limit" && (
@@ -86,7 +87,20 @@ export function NodeConfig({ node, datasources, onChange }: Props) {
               />
             </Field>
           )}
-          {(d.operation === "sort" || d.operation === "filter") && (
+          {(d.operation === "aggregate") && (
+            <Field label="Aggregate operation">
+                <select
+                  className={inputClass}
+                  value={str(d.aggregate_op) || "sum"}
+                  onChange={(e) => onChange({ aggregate_op: e.target.value})}
+                >
+                  {["sum", "avg", "count", "min", "max"].map((aggregate_op) => (
+                    <option key={aggregate_op}>{aggregate_op}</option>
+                  ))}
+                </select>
+            </Field>
+          )}
+          {(d.operation === "sort" || d.operation === "filter" || d.operation === "aggregate") && (
             <Field label="Column">
               <input
                 className={inputClass}
@@ -123,6 +137,16 @@ export function NodeConfig({ node, datasources, onChange }: Props) {
                 onChange={(e) => onChange({ value: e.target.value })}
               />
             </div>
+          )}
+          {d.operation === "aggregate" && (
+            <Field label="Group by column">
+              <input
+                className={inputClass}
+                placeholder="group by column"
+                value={str(d.group_by)}
+                onChange={(e) => onChange({ group_by: e.target.value })}
+              />
+            </Field>
           )}
         </>
       )}
