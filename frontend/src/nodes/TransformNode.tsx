@@ -12,6 +12,8 @@ function describe(data: CanvasNode["data"]): string {
       return `sort by ${String(data.column ?? "…")}${data.descending ? " ↓" : " ↑"}`;
     case "filter":
       return `where ${String(data.column ?? "…")} ${String(data.op ?? "==")} ${String(data.value ?? "…")}`;
+    case "aggregate":
+      return `${String(data.aggregate_op ?? "…")} ${String(data.column ?? "…")}${data.group_by ? ` grouped by ${String(data.group_by)}` : ""}`;
     default:
       return "Not configured";
   }

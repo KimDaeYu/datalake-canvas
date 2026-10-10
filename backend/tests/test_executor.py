@@ -9,6 +9,7 @@ from datalake_canvas.models import (
     WorkflowIn,
     WorkflowNode,
 )
+from datalake_canvas.nodes import NodeError, TransformConfig, apply_transform
 from tests.conftest import FakeGateway
 
 
@@ -189,3 +190,73 @@ async def test_transform_limit_select_filter(sales_table):
         sales_table, operation="filter", column="region", op="contains", value="a"
     )
     assert {r[0] for r in contains.rows} == {"NA", "APAC", "LATAM"}
+
+
+@pytest.mark.parametrize(
+    ("aggregate_op", "expected"),
+    [
+        ("sum", [["North", 4.0], ["South", 10.0], [None, 5.0], ["Empty", None]]),
+        ("avg", [["North", 2.0], ["South", 10.0], [None, 5.0], ["Empty", None]]),
+        ("count", [["North", 2], ["South", 1], [None, 1], ["Empty", 0]]),
+        ("min", [["North", 1], ["South", 10], [None, 5], ["Empty", None]]),
+        ("max", [["North", 3], ["South", 10], [None, 5], ["Empty", None]]),
+    ],
+)
+async def test_transform_aggregate(aggregate_op, expected):
+    table = TableData(
+        columns=["region", "revenue"],
+        rows=[
+            ["North", 1],
+            ["South", None],
+            ["North", 3],
+            [None, 5],
+            ["South", 10],
+            ["Empty", None],
+        ],
+    )
+
+    result = await run_transform(
+        table,
+        operation="aggregate",
+        group_by="region",
+        aggregate_op=aggregate_op,
+        column="revenue",
+    )
+
+    assert result.columns == ["region", f"{aggregate_op}_revenue"]
+    assert result.rows == expected
+
+
+async def test_transform_aggregate_errors():
+    table = TableData(
+        columns=["region", "revenue"], rows=[["North", 1], ["South", object()], ["South", object()]]
+    )
+
+    with pytest.raises(Exception, match="requires numeric values"):
+        await run_transform(
+            table,
+            operation="aggregate",
+            group_by="region",
+            aggregate_op="sum",
+            column="revenue",
+        )
+
+    with pytest.raises(Exception, match="not comparable"):
+        await run_transform(
+            table,
+            operation="aggregate",
+            group_by="region",
+            aggregate_op="min",
+            column="revenue",
+        )
+
+
+def test_transform_aggregate_reports_the_real_problem_with_the_columns():
+    table = TableData(columns=["region", "revenue"], rows=[["EU", 1]])
+    config = {"operation": "aggregate", "aggregate_op": "sum", "column": "revenue"}
+
+    with pytest.raises(NodeError, match="aggregate requires 'group_by'"):
+        apply_transform(table, TransformConfig(**config))
+    # a group_by that is set but names a missing column must say so, not claim it is missing
+    with pytest.raises(NodeError, match="Unknown column 'nope'"):
+        apply_transform(table, TransformConfig(**config, group_by="nope"))
