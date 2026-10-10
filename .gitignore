@@ -16,7 +16,9 @@ build/
 dist/
 
 # Node
-node_modules/
+# No trailing slash: a symlinked node_modules is a file to git, and a "node_modules/" pattern
+# only matches directories.
+node_modules
 frontend/dist/
 *.tsbuildinfo
 
