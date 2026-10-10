@@ -121,10 +121,9 @@ def _sorted_rows(rows: list[list[Any]], idx: int, descending: bool) -> list[list
 
 
 def _aggregate(table: TableData, cfg: TransformConfig) -> tuple[list[list[Any]], list[str]]:
-    try:
-        group_idx = _column_index(table, cfg.group_by)
-    except NodeError:
-        raise NodeError("aggregate requires 'group_by'") from None
+    if not cfg.group_by:
+        raise NodeError("aggregate requires 'group_by'")
+    group_idx = _column_index(table, cfg.group_by)  # an unknown column keeps its own message
     value_idx = _column_index(table, cfg.column)
     groups: dict[Any, list[Any]] = {}
     try:

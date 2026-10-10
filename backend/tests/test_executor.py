@@ -9,6 +9,7 @@ from datalake_canvas.models import (
     WorkflowIn,
     WorkflowNode,
 )
+from datalake_canvas.nodes import NodeError, TransformConfig, apply_transform
 from tests.conftest import FakeGateway
 
 
@@ -248,3 +249,14 @@ async def test_transform_aggregate_errors():
             aggregate_op="min",
             column="revenue",
         )
+
+
+def test_transform_aggregate_reports_the_real_problem_with_the_columns():
+    table = TableData(columns=["region", "revenue"], rows=[["EU", 1]])
+    config = {"operation": "aggregate", "aggregate_op": "sum", "column": "revenue"}
+
+    with pytest.raises(NodeError, match="aggregate requires 'group_by'"):
+        apply_transform(table, TransformConfig(**config))
+    # a group_by that is set but names a missing column must say so, not claim it is missing
+    with pytest.raises(NodeError, match="Unknown column 'nope'"):
+        apply_transform(table, TransformConfig(**config, group_by="nope"))

@@ -87,17 +87,17 @@ export function NodeConfig({ node, datasources, onChange }: Props) {
               />
             </Field>
           )}
-          {(d.operation === "aggregate") && (
+          {d.operation === "aggregate" && (
             <Field label="Aggregate operation">
-                <select
-                  className={inputClass}
-                  value={str(d.aggregate_op) || "sum"}
-                  onChange={(e) => onChange({ aggregate_op: e.target.value})}
-                >
-                  {["sum", "avg", "count", "min", "max"].map((aggregate_op) => (
-                    <option key={aggregate_op}>{aggregate_op}</option>
-                  ))}
-                </select>
+              <select
+                className={inputClass}
+                value={str(d.aggregate_op) || "sum"}
+                onChange={(e) => onChange({ aggregate_op: e.target.value })}
+              >
+                {["sum", "avg", "count", "min", "max"].map((aggregate_op) => (
+                  <option key={aggregate_op}>{aggregate_op}</option>
+                ))}
+              </select>
             </Field>
           )}
           {(d.operation === "sort" || d.operation === "filter" || d.operation === "aggregate") && (
