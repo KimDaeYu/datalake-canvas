@@ -24,7 +24,7 @@ Canvas uses as its reference MySQL data source.
 | `MYSQL_USER` | User name (required) |
 | `MYSQL_PASSWORD` | Password (required, but may be empty) |
 | `MYSQL_DATABASE` | Default database (required) |
-| `MYSQL_STATEMENT_TIMEOUT_MS` | Statement timeout, default `30000`, must be at least 1 |
+| `MYSQL_STATEMENT_TIMEOUT_MS` | Statement timeout, default `30000`, must be at least 1; keep it below the backend timeout, see [Known limits](#known-limits) |
 
 The example config references all five variables, so set all of them when you use it (an
 undefined variable stops the backend at startup). The defaults for host and port apply only when
@@ -33,13 +33,16 @@ you run the server standalone.
 ## Safety model
 
 * Every connection runs `START TRANSACTION READ ONLY` and sets `MAX_EXECUTION_TIME`
-  (`MYSQL_STATEMENT_TIMEOUT_MS`, default 30 s).
+  (`MYSQL_STATEMENT_TIMEOUT_MS`, default 30 s). The limit applies to every statement `run_select`
+  accepts (`SELECT`, `WITH` and `VALUES`), including subqueries and CTEs.
 * `run_select` accepts only statements starting with `SELECT`, `WITH` or `VALUES`.
 * Multi-statement support is off, so `SELECT 1; DELETE ...` is a syntax error.
 * Locking reads (`SELECT ... FOR UPDATE`) are rejected by the read-only transaction.
 * Statements containing an `INTO` keyword outside strings, quoted identifiers and comments are
   rejected by the server (`INTO OUTFILE`, `INTO DUMPFILE` and `INTO @variable`), and so are
   executable comments (`/*! ... */`).
+* Optimizer hints (`/*+ ... */`) are rejected too, because a hint can change or remove the
+  statement time limit for a single statement.
 
 ### Known limits
 
@@ -56,6 +59,11 @@ you run the server standalone.
   prefer a trusted network.
 * When a result is cut at `max_rows`, the connection is closed without reading the rest; the
   server stops the query shortly afterwards (at the latest at the statement timeout).
+* If the caller gives up first, MySQL does not notice that the client is gone, so the query keeps
+  running until the statement timeout. The DataLake Canvas backend stops the server process when
+  `DLC_QUERY_TIMEOUT_SECONDS` (default 30 s) runs out and needs about two more seconds to do so.
+  Keep `MYSQL_STATEMENT_TIMEOUT_MS` clearly below the backend timeout, for example `20000` with
+  the default backend settings.
 * **Always connect with a `SELECT`-only account.** The guard and the read-only transaction are
   defense in depth; the account's grants are the guarantee.
 
@@ -68,6 +76,8 @@ you run the server standalone.
   `"<N bytes>"`.
 * `describe_table` returns short type names (`data_type`): `decimal`, not `decimal(10,2)`.
 * Result column names can repeat (for example `SELECT c.id, o.id ...` gives `["id", "id"]`).
+* When the time limit interrupts `SLEEP()` or `BENCHMARK()`, they return a normal result (`1` or
+  `0`) instead of an error.
 
 ## Run it standalone
 
