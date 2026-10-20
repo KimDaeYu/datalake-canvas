@@ -1,6 +1,6 @@
 # Build context is the repository root (see docker-compose.yml) so the MCP servers and demo
 # data can be copied in alongside the backend.
-FROM python:3.12-slim
+FROM python:3.15-slim
 
 ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 WORKDIR /app
